@@ -1,0 +1,268 @@
+#usage  "en:<qt><nobr><b>SparkFun Eagle CAD Setup ULP</b>"
+        "<p>"
+        "This ULP sets up Eagle CAD to the default SparkFun Electronics \
+        configuration.<br>"
+        "All of the current SparkFun libraries are also temperally installed \
+        for the duration of the session."
+        "<p>"
+        "<author>Author: TechSupport@SparkFun.com</author></qt>"
+
+// THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, EXPRESSED
+// OR IMPLIED
+
+// 1.0.0 - 2016-01-27 --- Initial version
+
+#require 6.0000
+//int Version = 1;
+string Version = "1.0.0";
+
+// Source configuration this section will need to be manually updated if the
+// structure on GitHub changes
+string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/scr/";
+string settingsURLFile = "eagle.scr";
+string downloadPath = "https://raw.githubusercontent.com/sparkfun/SparkFun-Eagle-Libraries/master/";
+int numberOfLibraries = 20;
+string libraries[] = {  "GeekAmmo.lbr",
+                        "LilyPad-Wearables.lbr",
+                        "SparkFun-Aesthetics.lbr",
+                        "SparkFun-AnalogIC.lbr",
+                        "SparkFun-Boards.lbr",
+                        "SparkFun-Capacitors.lbr",
+                        "SparkFun-Connectors.lbr",
+                        "SparkFun-DigitalIC.lbr",
+                        "SparkFun-DiscreteSemi.lbr",
+                        "SparkFun-Displays.lbr",
+                        "SparkFun-Electromechanical.lbr",
+                        "SparkFun-FreqCtrl.lbr",
+                        "SparkFun-LED.lbr",
+                        "SparkFun-Passives.lbr",
+                        "SparkFun-PowerIC.lbr",
+                        "SparkFun-RF.lbr",
+                        "SparkFun-Resistors.lbr",
+                        "SparkFun-Retired.lbr",
+                        "SparkFun-Sensors.lbr",
+                        "User-Submitted.lbr"
+};
+
+
+// A few globals (lazy)
+string run_info = "Configure and download libraries";
+int level = 0;      // Flag for configuration level
+int permanent = 0;  // Flag for permanance of file writes
+string currentlyDownloadingFile = "";
+
+
+
+void updateMenu(void)
+{
+  switch(level)
+  {
+    case 0 :  // Full configuration and download
+      sprintf(run_info, "Configure and download libraries %s",
+        (permanent == 1) ? "permanently" : "");
+      break;
+    case 1 :  // Configuration only
+      sprintf(run_info, "Configure %s",
+        (permanent == 1) ? "permanently" : "");
+      break;
+    case 2 :  // Download only
+      sprintf(run_info, "Download libraries %s",
+        (permanent == 1) ? "permanently" : "");
+      break;
+  }
+  return;
+}
+
+
+
+void downloadFile(string URLPath, string URLFile, string destination)
+{
+  status("Downloading " + URLPath + URLFile);
+  currentlyDownloadingFile = URLFile;
+
+  char result[];
+  int numberOfBytes = netget(result, URLPath + URLFile);
+  if (numberOfBytes >= 0)
+  {
+    fileerror();
+    output(destination, "wbDF")
+    {
+      for(int i = 0; i < numberOfBytes; ++i)
+      {
+        if (result[i] == 0)
+        {
+          printf("%c", 0x00);
+        }
+        else
+        {
+          printf("%c", result[i]);
+        }
+      }
+    }
+    if (fileerror())
+    {
+      exit(1);
+    }
+  }
+  else
+  {
+    dlgMessageBox(neterror());
+  }
+}
+
+
+
+void downloadLibraries(void)
+{
+  for (int i = 0; i < numberOfLibraries; i++)
+  {
+    downloadFile(downloadPath, libraries[i],
+                 EAGLE_DIR + "/lbr/" + libraries[i]);
+  }
+  return;
+}
+
+
+
+void writeConfigurationScript(void)
+{
+  output(EAGLE_DIR + "/scr/" + "configureLibraries.scr", "wtD")
+  {
+    printf("USE -*\n");
+
+    for (int i = 0; i < numberOfLibraries; i++)
+    {
+      printf("USE " + libraries[i] + "\n");
+    }
+
+    printf("SCRIPT " + EAGLE_DIR + "/scr/" + "SFEagle.scr\n");
+  }
+}
+
+
+
+void configureSettings(void)
+{
+  string script = EAGLE_DIR + "/scr/" + "SFEagle.scr";
+  status("Getting eagle.scr...");
+  downloadFile(settingsURLPath, settingsURLFile, script);
+  writeConfigurationScript();
+  script = EAGLE_DIR + "/scr/" + "configureLibraries.scr";
+  exit("script '" + script + "'");
+}
+
+
+
+void doConfiguration(void)
+{
+  switch (level)
+  {
+    case 0 :  // Full configuration and download
+      downloadLibraries();
+      configureSettings();
+      break;
+    case 1 :  // Configuration only
+      configureSettings();
+      break;
+    case 2 :  // Download only
+      downloadLibraries();
+      break;
+  }
+}
+
+
+
+void openDialog(void)
+{
+  int dialogActive = 1;
+  while(dialogActive)
+  {
+    dlgDialog("SparkFun Eagle CAD Configuration Tool")
+    {
+      dlgHBoxLayout
+      {
+        dlgVBoxLayout
+        {
+          dlgGroup("Available Eagle libraries")
+          {
+            for (int i = 0; i < numberOfLibraries; ++i)
+            {
+              dlgHBoxLayout
+              {
+                string libraryName;
+                if (currentlyDownloadingFile == libraries[i])
+                {
+                  sprintf(libraryName, "<b>%s</b>", libraries[i]);
+                  dlgLabel(libraryName, 1);
+                }
+                else
+                {
+                  dlgLabel(libraries[i], 1);
+                }
+              }
+            }
+          }
+          //dlgLabel(ratiologo, 1);
+          //dlgStretch(1);
+        }
+        dlgVBoxLayout
+        {
+          dlgGroup("Configuration level")
+          {
+            dlgRadioButton("&Full configuration and download", level)
+            {
+              updateMenu();
+            }
+            dlgRadioButton("&Configuration only", level)
+            {
+              updateMenu();
+            }
+            dlgRadioButton("&Download only", level)
+            {
+              updateMenu();
+            }
+          }
+          dlgGroup("Permanent write")
+          {
+            dlgCheckBox("&Permanent", permanent)
+            {
+              updateMenu();
+            }
+          }
+          dlgLabel(" ULP-Version " + Version);
+          dlgStretch(1);
+        }
+      }
+      dlgStretch(1);
+      dlgLabel(run_info, 1);
+      dlgHBoxLayout
+      {
+        dlgPushButton("+OK")
+        {
+          if (dlgMessageBox("There is a chance that you will overwrite existing libraries of the same name.\nAre you sure?", "Yes", "No") == 0)
+          {
+            doConfiguration();
+            dialogActive = 0;
+            dlgAccept();
+          }
+          else
+          {
+            dlgReject();
+          }
+        }
+        dlgStretch(1);
+        dlgPushButton("-Cancel") exit(0);
+      }
+    };
+  }
+}
+
+
+
+// ***************** main ****************
+//dlgMessageBox(usage, "OK");
+
+void main(void)
+{
+  openDialog();
+}
