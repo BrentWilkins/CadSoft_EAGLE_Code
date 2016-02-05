@@ -1,26 +1,37 @@
 #usage  "en:<nobr><b>SparkFun Eagle CAD Setup ULP</b>"
         "<p>"
-        "This ULP sets up Eagle CAD to the default SparkFun Electronics \
+        "This ULP sets up EAGLE to the default SparkFun Electronics \
         configuration.<br>"
-        "All of the current SparkFun libraries are also temperally installed \
-        for the duration of the session."
+        "All of the current SparkFun EALGE files can also be installed."
         "<p>"
         "<author>Author: TechSupport@SparkFun.com</author>"
 
 // THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, EXPRESSED
 // OR IMPLIED
 
+// 1.1.0 - 2016-02-05 --- Added ability to change download path, warn before
+//                          overwrite, status, download CAMs, ULPs, etc.
 // 1.0.0 - 2016-01-27 --- Initial version
 
 #require 6.0000
-//int Version = 1;
-string Version = "1.0.0";
+string Version = "1.1.0";
 
 // Source configuration this section will need to be manually updated if the
 // structure on GitHub changes
-string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/scr/";
-string settingsURLFile = "eagle.scr";
-string downloadPath = "https://raw.githubusercontent.com/sparkfun/SparkFun-Eagle-Libraries/master/";
+//string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/scr/";
+string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/";
+string SFEagleFile = "eagle.scr";
+string libraryDownloadPath = "https://raw.githubusercontent.com/sparkfun/SparkFun-Eagle-Libraries/master/";
+
+// Default install paths can be modified for the session in the GUI
+string localDRUDir = EAGLE_DIR + "/dru/";
+string localCAMDir = EAGLE_DIR + "/cam/";
+string localULPDir = EAGLE_DIR + "/ulp/";
+string localSCRDir = EAGLE_DIR + "/scr/";
+string localLBRDir = EAGLE_DIR + "/lbr/";
+
+// These lists of libraries DRUs, etc must be manually updated if the structure
+//   on GitHub changes. 
 int numberOfLibraries = 20;
 string libraries[] = {  "GeekAmmo.lbr",
                         "LilyPad-Wearables.lbr",
@@ -44,135 +55,374 @@ string libraries[] = {  "GeekAmmo.lbr",
                         "User-Submitted.lbr"
 };
 
+int numberOfDRUs = 5;
+string DRUs[] = { "SparkFun-2-layer-STANDARD.dru",
+                  "SparkFun-2-layer-TIGHT.dru",
+                  "SparkFun-2-layer-FAB-LIMIT.dru",
+                  "SparkFun-4-layer-FAB-LIMIT.dru",
+                  "SparkFun-4-layer-TIGHT.dru"
+};
 
+int numberOfULPs = 17;
+string ULPs[] = { "Unrouted.ulp",
+                  "bom_mod.ulp",
+                  "exp-lbrs.ulp",
+                  "adimv4_0mm.ulp",
+                  "bom_sparkle.ulp",
+                  "exp-project-lbr.ulp",
+                  "autodim_in.ulp",
+                  "drill-exactsize.ulp",
+                  "import-bmp.ulp",
+                  "autodim_mil.ulp",
+                  "eagleUp_export.ulp",
+                  "mirror-board.ulp",
+                  "board_default.ulp",
+                  "eagle_to_3d.ulp",
+                  "oshw-logo.ulp",
+                  "bom.ulp",
+                  "eagle_to_3d_3_4.ulp"
+};
+
+int numberOfSCRs = 1;
+string SCRs[] = { "eagle.scr"
+};
+
+int numberOfCAMs = 8;
+string CAMs[] = { "GTLONLY.cam",
+                  "STENCILcam-GTP_GBP_ONLY.cam",
+                  "oshpark-gerb274x-4layer.cam",
+                  "oshpark-gerb274x.cam",
+                  "sfe-gerb274x-4layer.cam",
+                  "sfe-gerb274x-withGBP.cam",
+                  "sfe-gerb274x.cam",
+                  "sfe-gerb274x_GP_FOR_CASTELLATED_HEADERS.cam"
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
 // A few globals (lazy)
-string run_info = "Configure and download libraries";
+////////////////////////////////////////////////////////////////////////////////
+string run_info = "<b>Configure &amp; download libraries</b>";
 int level = 0;      // Flag for configuration level
 int permanent = 0;  // Flag for permanance of file writes
-string currentlyDownloadingFile = "";
+// Boolean, overwrite flags, and return value constants...
+enum { FALSE = 0, TRUE, OFF, YES, NO, ABORT, YES_ALL, NO_ALL };
+int writeAll = OFF; // File overwrite flag
+int installLBRs = 1;
+int installDRUs = 1;
+int installULPs = 1;
+int installSCRs = 1;
+int installCAMs = 1;
 
 
-
-void updateMenu(void)
+////////////////////////////////////////////////////////////////////////////////
+// Work around to get filesize zero'd out
+// TODO: This still doesn't work
+////////////////////////////////////////////////////////////////////////////////
+void workAround(void)
 {
-  switch(level)
+  fileerror();
+  output("null.txt", "wtD")
   {
-    case 0 :  // Full configuration and download
-      sprintf(run_info, "Configure and download libraries %s",
-        (permanent == 1) ? "permanently" : "");
-      break;
-    case 1 :  // Configuration only
-      sprintf(run_info, "Configure %s",
-        (permanent == 1) ? "permanently" : "");
-      break;
-    case 2 :  // Download only
-      sprintf(run_info, "Download libraries %s",
-        (permanent == 1) ? "permanently" : "");
-      break;
+    printf("");
   }
-  return;
+  if (fileerror())
+  {
+    exit(1);
+  }
+
+  filesize("null.txt");
 }
 
 
 
-void downloadFile(string URLPath, string URLFile, string destination)
+////////////////////////////////////////////////////////////////////////////////
+// Displays a dialog box with 5 options: Yes, No, Abort, No to All, & Yes to all
+////////////////////////////////////////////////////////////////////////////////
+int showLargeDialog(string title, string message)
 {
-  status("Downloading " + URLFile);
-  currentlyDownloadingFile = URLFile;
-
-  char result[];
-  int numberOfBytes = netget(result, URLPath + URLFile);
-  if (numberOfBytes >= 0)
+  return dlgDialog(title)
   {
-    fileerror();
-    output(destination, (permanent) ? "wbF" : "wbDF")
-    {
-      for(int i = 0; i < numberOfBytes; ++i)
-      {
-        if (result[i] == 0)
-        {
-          printf("%c", 0x00);
-        }
-        else
-        {
-          printf("%c", result[i]);
-        }
-      }
+    dlgLabel(message);
+    dlgHBoxLayout {
+      dlgPushButton("+&Yes") dlgAccept(YES);
+      dlgPushButton("&No") dlgAccept(NO);
+      dlgPushButton("-&Abort") dlgReject(ABORT);
+      dlgPushButton("N&o to All") dlgAccept(NO_ALL);
+      dlgPushButton("Yes to &All") dlgAccept(YES_ALL);
     }
-    if (fileerror())
+  };
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Returns true if the file doesn't alreadt exist or use okay's the overwrite
+////////////////////////////////////////////////////////////////////////////////
+int okayToWrite(string fileName)
+{
+int returnValue = FALSE;  // Safe default
+  /* Debug code block
+  string fSize = "";
+  fSize[0] = '\0';
+  workAround();
+  sprintf(fSize, "%d", filesize(fileName));
+  dlgMessageBox("okayToWrite: " + fileName + "\tSize: " + fSize);
+  */
+  if (filesize(fileName) > 0)
+  {
+    switch (writeAll)
     {
-      exit(1);
+      case OFF:
+        switch (showLargeDialog("Overwrite existing file?", fileName +
+                " already exists.\n" +
+                "This operation will overwrite it." +
+                "\nAre you sure?"))
+        {
+          case YES:
+            returnValue = TRUE; // Okay to write
+            break;
+          case NO:
+            returnValue = FALSE;  // Don't overwrite file because user chose no
+            break;
+          case ABORT:
+            exit(1);  // TODO: This might be extreme(?)
+            break;
+          case NO_ALL:
+            returnValue = FALSE;  // Don't write this file
+            writeAll = NO_ALL;    // Don't write any other remaining files
+            break;
+          case YES_ALL:
+            returnValue = TRUE;   // Write this file
+            writeAll = YES_ALL;   // Write any other remaining files
+            break;
+        }
+        break;
+      case YES_ALL:
+        returnValue = TRUE; // Okay to write
+        break;
+      case NO_ALL:
+        returnValue = FALSE;  // Don't overwrite file because user chose no
+        break;
     }
   }
   else
   {
-    dlgMessageBox(neterror());
+    returnValue = TRUE; // Okay to write the file since it doesn't exist
   }
+  return returnValue;
 }
 
-
-
-void downloadLibraries(void)
+////////////////////////////////////////////////////////////////////////////////
+// Updates text on the GUI based on selected settings
+////////////////////////////////////////////////////////////////////////////////
+void updateMenu(void)
 {
-  for (int i = 0; i < numberOfLibraries; i++)
+  // Update the dlgLabel 'run_info' with selected action(s)
+  switch(level)
   {
-    downloadFile(downloadPath, libraries[i],
-                 EAGLE_DIR + "/lbr/" + libraries[i]);
+    case 0 :  // Full configuration and download
+      sprintf(run_info, "<b>Configure &amp; download libraries %s",
+        (permanent == 1) ? "permanently</b>" : "</b>");
+      break;
+    case 1 :  // Configuration only
+      sprintf(run_info, "<b>Configure %s",
+        (permanent == 1) ? "permanently" : "");
+      break;
+    case 2 :  // Download only
+      sprintf(run_info, "<b>Download libraries %s",
+        (permanent == 1) ? "permanently</b>" : "</b>");
+      break;
   }
   return;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Download a file (text or binary) to local drive
+////////////////////////////////////////////////////////////////////////////////
+void downloadFile(string URLPath, string URLFile, string destination)
+{
+  if (okayToWrite(destination))
+  {
+    status("Downloading " + URLFile);
+
+    char result[];
+    int numberOfBytes = netget(result, URLPath + URLFile, 60 /*timeout (sec)*/);
+    if (numberOfBytes >= 0)
+    {
+      fileerror();
+      output(destination, (permanent) ? "wbF" : "wbDF")
+      {
+        for(int i = 0; i < numberOfBytes; ++i)
+        {
+          if (result[i] == 0)
+          {
+            printf("%c", 0x00);
+          }
+          else
+          {
+            printf("%c", result[i]);
+          }
+        }
+      }
+      if (fileerror())
+      {
+        exit(1);
+      }
+    }
+    else
+    {
+      dlgMessageBox(neterror());
+    }
+  }
+}
 
 
+////////////////////////////////////////////////////////////////////////////////
+// Download all of the SparkFun EAGLE libraries
+////////////////////////////////////////////////////////////////////////////////
+void downloadLBRs(void)
+{
+  for (int i = 0; i < numberOfLibraries; i++)
+  {
+    downloadFile(libraryDownloadPath, libraries[i], localLBRDir + libraries[i]);
+  }
+  writeAll = OFF;  // Turn off download all/none after getting all libraries
+  return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Download all of the SparkFun EAGLE DRUs
+////////////////////////////////////////////////////////////////////////////////
+void downloadDRUs(void)
+{
+  for (int i = 0; i < numberOfDRUs; i++)
+  {
+    downloadFile(settingsURLPath + "dru/", DRUs[i], localDRUDir + DRUs[i]);
+  }
+  writeAll = OFF;  // Turn off download all/none after getting all DRUs
+  return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Download all of the SparkFun EAGLE ULPs
+////////////////////////////////////////////////////////////////////////////////
+void downloadULPs(void)
+{
+  for (int i = 0; i < numberOfULPs; i++)
+  {
+    downloadFile(settingsURLPath + "ulp/", ULPs[i], localULPDir + ULPs[i]);
+  }
+  writeAll = OFF;  // Turn off download all/none after getting all ULPs
+  return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Download all of the SparkFun EAGLE SCRs
+////////////////////////////////////////////////////////////////////////////////
+void downloadSCRs(void)
+{
+  for (int i = 0; i < numberOfSCRs; i++)
+  {
+    downloadFile(settingsURLPath + "scr/", SCRs[i], localSCRDir + SCRs[i]);
+  }
+  writeAll = OFF;  // Turn off download all/none after getting all SCRs
+  return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Download all of the SparkFun EAGLE CAMs
+////////////////////////////////////////////////////////////////////////////////
+void downloadCAMs(void)
+{
+  for (int i = 0; i < numberOfCAMs; i++)
+  {
+    downloadFile(settingsURLPath + "cam/", CAMs[i], localCAMDir + CAMs[i]);
+  }
+  writeAll = OFF;  // Turn off download all/none after getting all CAMs
+  return;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Writes an EAGLE SCR to configure active libraries & run SparkFun's eagle.scr
+////////////////////////////////////////////////////////////////////////////////
 void writeConfigurationScript(void)
 {
-  output(EAGLE_DIR + "/scr/" + "configureLibraries.scr", (permanent) ? "wt" :
-         "wtD")
+  output(localSCRDir + "configureLibraries.scr", (permanent) ? "wt" : "wtD")
   {
     printf("USE -*\n");
 
     for (int i = 0; i < numberOfLibraries; i++)
     {
-      printf("USE " + "$EAGLEDIR/lbr/" + libraries[i] + "\n");
+      printf("USE " + localLBRDir + libraries[i] + "\n");
     }
 
-    printf("SCRIPT " + EAGLE_DIR + "/scr/" + "SFEagle.scr\n");
+    printf("SCRIPT " + localSCRDir + "SFEagle.scr\n");
   }
 }
 
-
+////////////////////////////////////////////////////////////////////////////////
 // TODO: Configuration fails if libraries aren't installed.
+////////////////////////////////////////////////////////////////////////////////
 void configureSettings(void)
 {
-  string script = EAGLE_DIR + "/scr/" + "SFEagle.scr";
+  writeAll = OFF; // Don't keep old setting from another download type
+  // Keeping unique name to make sure the correct one is run
+  string script = localSCRDir + "SFEagle.scr";
   status("Getting eagle.scr...");
-  downloadFile(settingsURLPath, settingsURLFile, script);
+  downloadFile(settingsURLPath + "scr/", SFEagleFile, script);
   writeConfigurationScript();
-  script = EAGLE_DIR + "/scr/" + "configureLibraries.scr";
+  script = localSCRDir + "configureLibraries.scr";
   exit("script '" + script + "'");
 }
 
+void warnAboutSpeed(void)
+{
+  dlgMessageBox("Be patient while files download. This can take some time."
+    + " You will get a dialog box on error or the configuration tool will "
+    + "go away on success. Current download is shown in status bar.");
+}
 
 
+////////////////////////////////////////////////////////////////////////////////
+// Based on state of GUI, run the desired tasks
+////////////////////////////////////////////////////////////////////////////////
 void doConfiguration(void)
 {
   switch (level)
   {
     case 0 :  // Full configuration and download
-      downloadLibraries();
+      warnAboutSpeed();
+      if (installLBRs)
+        downloadLBRs();
+      if (installDRUs)
+        downloadDRUs();
+      if (installULPs)
+        downloadULPs();
+      if (installSCRs)
+        downloadSCRs();
+      if (installCAMs)
+        downloadCAMs();
       configureSettings();
       break;
     case 1 :  // Configuration only
       configureSettings();
       break;
     case 2 :  // Download only
-      downloadLibraries();
+      warnAboutSpeed();
+      downloadLBRs();
+      downloadDRUs();
+      downloadULPs();
+      downloadSCRs();
+      downloadCAMs();
       break;
   }
 }
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+// This function draws the main GUI
+////////////////////////////////////////////////////////////////////////////////
 void openDialog(void)
 {
   int dialogActive = 1;
@@ -180,59 +430,132 @@ void openDialog(void)
   {
     dlgDialog("SparkFun Eagle CAD Configuration Tool")
     {
-      dlgHBoxLayout
+      dlgVBoxLayout
       {
-        dlgVBoxLayout
-        {
-          dlgGroup("Available Eagle libraries")
-          {
-            for (int i = 0; i < numberOfLibraries; ++i)
-            {
-              dlgHBoxLayout
-              {
-                string libraryName;
-                if (currentlyDownloadingFile == libraries[i])
-                {
-                  sprintf(libraryName, "<b>%s</b>", libraries[i]);
-                  dlgLabel(libraryName, 1);
-                }
-                else
-                {
-                  dlgLabel(libraries[i], 1);
-                }
-              }
-            }
-          }
-          //dlgLabel(ratiologo, 1);
-          //dlgStretch(1);
-        }
-        dlgVBoxLayout
+        dlgHBoxLayout
         {
           dlgGroup("Configuration level")
           {
-            dlgRadioButton("&Full configuration and download", level)
+            dlgRadioButton("&Full configuration and download", level) //level= 0
             {
               updateMenu();
             }
-            dlgRadioButton("&Configuration only", level)
+            dlgRadioButton("&Configuration only", level)  // level = 1
             {
               updateMenu();
             }
-            dlgRadioButton("&Download only", level)
+            dlgRadioButton("&Download only", level) // level = 2
             {
               updateMenu();
             }
           }
-          dlgGroup("Permanent write")
+          dlgGroup("Save downloads permanently or have them removed when EAGLE"
+                   + " is closed")
           {
-            dlgCheckBox("&Permanent", permanent)
+            dlgCheckBox("&Permanent", permanent)  //unchecked is 0, checked is 1
             {
               updateMenu();
             }
           }
           dlgLabel(" ULP-Version " + Version);
-          dlgStretch(1);
         }
+        dlgGroup("Library source URL")
+        {
+          dlgStringEdit(libraryDownloadPath);
+        }
+        dlgGroup("Directory libraries will be written to")
+        {
+          dlgHBoxLayout
+          {
+            dlgCheckBox("", installLBRs);
+            dlgStringEdit(localLBRDir);
+            dlgPushButton("&Change")
+            {
+              string temporaryPath =
+                dlgDirectory("Select destination directory",
+                localLBRDir);
+              if (temporaryPath)  // Cancel button returns empty string
+              {
+                localLBRDir = temporaryPath + "/";
+              }
+            }
+          }
+        }
+
+
+        dlgGroup("Directory design rules will be written to")
+        {
+          dlgHBoxLayout
+          {
+            dlgCheckBox("", installDRUs);
+            dlgStringEdit(localDRUDir);
+            dlgPushButton("&Change")
+            {
+              string temporaryPath =
+                dlgDirectory("Select destination directory",
+                localDRUDir);
+              if (temporaryPath)  // Cancel button returns empty string
+              {
+                localDRUDir = temporaryPath + "/";
+              }
+            }
+          }
+        }
+        dlgGroup("Directory User Language Programs will be written to")
+        {
+          dlgHBoxLayout
+          {
+            dlgCheckBox("", installULPs);
+            dlgStringEdit(localULPDir);
+            dlgPushButton("&Change")
+            {
+              string temporaryPath =
+                dlgDirectory("Select destination directory",
+                localULPDir);
+              if (temporaryPath)  // Cancel button returns empty string
+              {
+                localULPDir = temporaryPath + "/";
+              }
+            }
+          }
+        }
+        dlgGroup("Directory scripts will be written to")
+        {
+          dlgHBoxLayout
+          {
+            dlgCheckBox("", installSCRs);
+            dlgStringEdit(localSCRDir);
+            dlgPushButton("&Change")
+            {
+              string temporaryPath =
+                dlgDirectory("Select destination directory",
+                localSCRDir);
+              if (temporaryPath)  // Cancel button returns empty string
+              {
+                localSCRDir = temporaryPath + "/";
+              }
+            }
+          }
+        }
+        dlgGroup("Directory CAM jobs will be written to")
+        {
+          dlgHBoxLayout
+          {
+            dlgCheckBox("", installCAMs);
+            dlgStringEdit(localCAMDir);
+            dlgPushButton("&Change")
+            {
+              string temporaryPath =
+                dlgDirectory("Select destination directory",
+                localCAMDir);
+              if (temporaryPath)  // Cancel button returns empty string
+              {
+                localCAMDir = temporaryPath + "/";
+              }
+            }
+          }
+        }
+        //dlgStretch(1);
       }
       dlgStretch(1);
       dlgLabel(run_info, 1);
@@ -240,16 +563,10 @@ void openDialog(void)
       {
         dlgPushButton("+OK")
         {
-          if (dlgMessageBox("There is a chance that you will overwrite existing libraries of the same name.\nAre you sure?", "Yes", "No") == 0)
-          {
-            doConfiguration();
-            dialogActive = 0;
-            dlgAccept();
-          }
-          else
-          {
-            dlgReject();
-          }
+          doConfiguration();
+          dialogActive = 0;
+          dlgAccept();
+          dlgReject();
         }
         dlgStretch(1);
         dlgPushButton("-Cancel") exit(0);
@@ -258,9 +575,6 @@ void openDialog(void)
   }
 }
 
-
-
-// ***************** main ****************
 //dlgMessageBox(usage, "OK");
 
 void main(void)
