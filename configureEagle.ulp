@@ -14,7 +14,7 @@
 // 1.0.0 - 2016-01-27 --- Initial version
 
 #require 6.0000
-string Version = "1.1.0";
+string Version = "1.1.1";
 
 // Source configuration this section will need to be manually updated if the
 // structure on GitHub changes
@@ -590,22 +590,24 @@ void openDialog(void)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// 
+// Compares the version of this ULP with the latest found on GitHub. If there
+// is a newer version this ULP replaces itself with the newer one and runs it.
 ////////////////////////////////////////////////////////////////////////////////
 void updateULP(void)
 {
   string latestULP;
-  if (netget(latestULP, "https://raw.githubusercontent.com/BrentWilkins/CadSoft_EAGLE_Code/master/configureEagle.ulp")
-      >= 0)
+  int numberOfBytes = netget(latestULP, "https://raw.githubusercontent.com/BrentWilkins/CadSoft_EAGLE_Code/master/configureEagle.ulp");
+  if (numberOfBytes >= 0)
   {
+    if (numberOfBytes == 0) return; // No network error, but garbage
+
     // process latestULP to find version definition
-    int firstChar = strstr(latestULP, "string Version = ", 600);
+    int firstChar = strstr(latestULP, "string Version = ");
     string integer;
     // Update firstChar index to be first character index in the version string
     firstChar = strstr(latestULP, "\"", firstChar) + 1;
     int lastChar = strstr(latestULP, "\"", firstChar);
     string latestVersion = strsub(latestULP, firstChar, lastChar - firstChar);
-    dlgMessageBox("Version: " + latestVersion);
 
     string current[], latest[];
     if (strsplit(latest, latestVersion, '.') != 3)
@@ -616,28 +618,29 @@ void updateULP(void)
     {
       dlgMessageBox("Version of this not ULP not valid.");
     }
+
     // Compare version numbers to see if this file is current
-string temp;
     for (int i = 0; i < 3; i++)
     {
-sprintf(temp, "%d", i);
-      dlgMessageBox("Comparing subversion " + temp);
       if (latest[i] > current[i])
       {
-        dlgMessageBox("ULP isn't current");
-        break;
+        dlgMessageBox("ULP isn't current, saving newer version...");
+        output(argv[0], "wbF")
+        {
+          printf("%s", latestULP);
+        }
+        if (fileerror())
+        {
+          exit(1);
+        }
+        exit("RUN '" + argv[0] + "'");  // Run latest version
       }
-      else
-      {
-        dlgMessageBox("subversion matches");
-      }
-    }
-  }
+    } // End of for loop
+  }   // End successful network read
   else
   {
     dlgMessageBox(neterror());
   }
-
 }
 
 //dlgMessageBox(usage, "OK");
@@ -645,5 +648,5 @@ sprintf(temp, "%d", i);
 void main(void)
 {
   updateULP();
-  //openDialog();
+  openDialog();
 }
