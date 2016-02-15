@@ -1,15 +1,15 @@
 #usage  "en:<nobr><b>SparkFun Eagle CAD Setup ULP</b>"
         "<p>"
-        "This ULP sets up EAGLE to the default SparkFun Electronics \
-        configuration.<br>"
-        "All of the current SparkFun EALGE files can also be installed."
+        "<a href="https://raw.githubusercontent.com/BrentWilkins/CadSoft_EAGLE_Code/master/configureEagle.ulp">This ULP</a> sets up EAGLE to the default SparkFun\
+          Electronics configuration.<br>"
+        "All of the current SparkFun EAGLE files can also be installed."
         "<p>"
         "<author>Author: TechSupport@SparkFun.com</author>"
 
 // THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, EXPRESSED
 // OR IMPLIED
 
-// 1.1.1 - 2015-02-15 --- Added code to autoupdate this ULP
+// 1.1.1 - 2015-02-15 --- Added code to autoupdate this ULP & other minor fixes
 // 1.1.0 - 2016-02-05 --- Added ability to change download path, warn before
 //                          overwrite, status, download CAMs, ULPs, etc.
 // 1.0.0 - 2016-01-27 --- Initial version
@@ -22,6 +22,7 @@ string Version = "1.1.1";
 string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/";
 string SFEagleFile = "eagle.scr";
 string libraryDownloadPath = "https://raw.githubusercontent.com/sparkfun/SparkFun-Eagle-Libraries/master/";
+string homeOfThisScript = "https://raw.githubusercontent.com/BrentWilkins/CadSoft_EAGLE_Code/master/configureEagle.ulp";
 
 // Default install paths can be modified for the session in the GUI
 string localDRUDir = EAGLE_DIR + "/dru/";
@@ -564,7 +565,7 @@ void openDialog(void)
 void updateULP(void)
 {
   string latestULP;
-  int numberOfBytes = netget(latestULP, "https://raw.githubusercontent.com/BrentWilkins/CadSoft_EAGLE_Code/master/configureEagle.ulp");
+  int numberOfBytes = netget(latestULP, homeOfThisScript);
   if (numberOfBytes >= 0)
   {
     if (numberOfBytes == 0) return; // No network error, but garbage
