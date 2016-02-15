@@ -471,18 +471,20 @@ void openDialog(void)
               updateMenu();
             }
           }
-          dlgLabel(" ULP-Version " + Version);
         }
+/*
         dlgGroup("Library source URL")
         {
           dlgStringEdit(libraryDownloadPath);
         }
+*/
         dlgGroup("Directory libraries will be written to")
         {
           dlgHBoxLayout
           {
             dlgCheckBox("", installLBRs);
-            dlgStringEdit(localLBRDir);
+            dlgLabel(localLBRDir, 1);
+            dlgStretch(1);
             dlgPushButton("&Change")
             {
               string temporaryPath =
@@ -495,14 +497,13 @@ void openDialog(void)
             }
           }
         }
-
-
         dlgGroup("Directory design rules will be written to")
         {
           dlgHBoxLayout
           {
             dlgCheckBox("", installDRUs);
-            dlgStringEdit(localDRUDir);
+            dlgLabel(localDRUDir, 1);
+            dlgStretch(1);
             dlgPushButton("&Change")
             {
               string temporaryPath =
@@ -520,7 +521,8 @@ void openDialog(void)
           dlgHBoxLayout
           {
             dlgCheckBox("", installULPs);
-            dlgStringEdit(localULPDir);
+            dlgLabel(localULPDir);
+            dlgStretch(1);
             dlgPushButton("&Change")
             {
               string temporaryPath =
@@ -538,7 +540,8 @@ void openDialog(void)
           dlgHBoxLayout
           {
             dlgCheckBox("", installSCRs);
-            dlgStringEdit(localSCRDir);
+            dlgLabel(localSCRDir, 1);
+            dlgStretch(1);
             dlgPushButton("&Change")
             {
               string temporaryPath =
@@ -556,7 +559,8 @@ void openDialog(void)
           dlgHBoxLayout
           {
             dlgCheckBox("", installCAMs);
-            dlgStringEdit(localCAMDir);
+            dlgLabel(localCAMDir, 1);
+            dlgStretch(1);
             dlgPushButton("&Change")
             {
               string temporaryPath =
@@ -582,7 +586,7 @@ void openDialog(void)
           dlgAccept();
           dlgReject();
         }
-        dlgStretch(1);
+        dlgLabel(" ULP-Version " + Version);
         dlgPushButton("-Cancel") exit(0);
       }
     };
