@@ -521,7 +521,7 @@ void openDialog(void)
           dlgHBoxLayout
           {
             dlgCheckBox("", installULPs);
-            dlgLabel(localULPDir);
+            dlgLabel(localULPDir, 1);
             dlgStretch(1);
             dlgPushButton("&Change")
             {
