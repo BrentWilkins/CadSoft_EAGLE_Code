@@ -18,7 +18,6 @@ string Version = "1.1.0";
 
 // Source configuration this section will need to be manually updated if the
 // structure on GitHub changes
-//string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/scr/";
 string settingsURLPath = "https://raw.githubusercontent.com/sparkfun/SparkFun_Eagle_Settings/master/";
 string SFEagleFile = "eagle.scr";
 string libraryDownloadPath = "https://raw.githubusercontent.com/sparkfun/SparkFun-Eagle-Libraries/master/";
@@ -113,6 +112,20 @@ int installDRUs = 1;
 int installULPs = 1;
 int installSCRs = 1;
 int installCAMs = 1;
+
+
+
+// Function strstr()
+// Scans a string for the first occurrence of a given substring.
+// Syntax
+//     int strstr(string s1, string s2[, int index]);
+// Returns
+// The strstr function returns the integer offset of the first character of s2 in s1, or -1 if the substring does not occur in the string.
+
+// string OrderCodes[];
+// if (fileread(OrderCodes, "ordercodes") > 0) {
+// string text;
+// int nChars = fileread(text, "data.txt");
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -575,9 +588,62 @@ void openDialog(void)
   }
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// 
+////////////////////////////////////////////////////////////////////////////////
+void updateULP(void)
+{
+  string latestULP;
+  if (netget(latestULP, "https://raw.githubusercontent.com/BrentWilkins/CadSoft_EAGLE_Code/master/configureEagle.ulp")
+      >= 0)
+  {
+    // process latestULP to find version definition
+    int firstChar = strstr(latestULP, "string Version = ", 600);
+    string integer;
+    // Update firstChar index to be first character index in the version string
+    firstChar = strstr(latestULP, "\"", firstChar) + 1;
+    int lastChar = strstr(latestULP, "\"", firstChar);
+    string latestVersion = strsub(latestULP, firstChar, lastChar - firstChar);
+    dlgMessageBox("Version: " + latestVersion);
+
+    string current[], latest[];
+    if (strsplit(latest, latestVersion, '.') != 3)
+    {
+      dlgMessageBox("Latest version of this ULP not found.");
+    }
+    if (strsplit(current, Version, '.') != 3)
+    {
+      dlgMessageBox("Version of this not ULP not valid.");
+    }
+    // Compare version numbers to see if this file is current
+string temp;
+    for (int i = 0; i < 3; i++)
+    {
+sprintf(temp, "%d", i);
+      dlgMessageBox("Comparing subversion " + temp);
+      if (latest[i] > current[i])
+      {
+        dlgMessageBox("ULP isn't current");
+        break;
+      }
+      else
+      {
+        dlgMessageBox("subversion matches");
+      }
+    }
+  }
+  else
+  {
+    dlgMessageBox(neterror());
+  }
+
+}
+
 //dlgMessageBox(usage, "OK");
 
 void main(void)
 {
-  openDialog();
+  updateULP();
+  //openDialog();
 }
