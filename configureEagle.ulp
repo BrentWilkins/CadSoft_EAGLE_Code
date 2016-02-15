@@ -116,40 +116,6 @@ int installCAMs = 1;
 
 
 
-// Function strstr()
-// Scans a string for the first occurrence of a given substring.
-// Syntax
-//     int strstr(string s1, string s2[, int index]);
-// Returns
-// The strstr function returns the integer offset of the first character of s2 in s1, or -1 if the substring does not occur in the string.
-
-// string OrderCodes[];
-// if (fileread(OrderCodes, "ordercodes") > 0) {
-// string text;
-// int nChars = fileread(text, "data.txt");
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Work around to get filesize zero'd out
-// TODO: This still doesn't work
-////////////////////////////////////////////////////////////////////////////////
-void workAround(void)
-{
-  fileerror();
-  output("null.txt", "wtD")
-  {
-    printf("");
-  }
-  if (fileerror())
-  {
-    exit(1);
-  }
-
-  filesize("null.txt");
-}
-
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // Displays a dialog box with 5 options: Yes, No, Abort, No to All, & Yes to all
 ////////////////////////////////////////////////////////////////////////////////
@@ -175,13 +141,6 @@ int showLargeDialog(string title, string message)
 int okayToWrite(string fileName)
 {
 int returnValue = FALSE;  // Safe default
-  /* Debug code block
-  string fSize = "";
-  fSize[0] = '\0';
-  workAround();
-  sprintf(fSize, "%d", filesize(fileName));
-  dlgMessageBox("okayToWrite: " + fileName + "\tSize: " + fSize);
-  */
   if (filesize(fileName) > 0)
   {
     switch (writeAll)
@@ -363,19 +322,24 @@ void writeConfigurationScript(void)
 {
   output(localSCRDir + "configureLibraries.scr", (permanent) ? "wt" : "wtD")
   {
-    printf("USE -*\n");
-
-    for (int i = 0; i < numberOfLibraries; i++)
+    // Check to see if a library exist for USE command. Checking a 'random' one
+    if (filesize(localLBRDir + libraries[2]) > 0)
     {
-      printf("USE " + localLBRDir + libraries[i] + "\n");
+      printf("USE -*\n");
+
+      for (int i = 0; i < numberOfLibraries; i++)
+      {
+        printf("USE " + localLBRDir + libraries[i] + "\n");
+      }
     }
 
+    // Always at least run our eagle.scr
     printf("SCRIPT " + localSCRDir + "SFEagle.scr\n");
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// TODO: Configuration fails if libraries aren't installed.
+// Create a configuration SCR and run it
 ////////////////////////////////////////////////////////////////////////////////
 void configureSettings(void)
 {
@@ -398,7 +362,7 @@ void warnAboutSpeed(void)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// Based on state of GUI, run the desired tasks
+// Based on state of GUI run the desired tasks
 ////////////////////////////////////////////////////////////////////////////////
 void doConfiguration(void)
 {
@@ -573,7 +537,6 @@ void openDialog(void)
             }
           }
         }
-        //dlgStretch(1);
       }
       dlgStretch(1);
       dlgLabel(run_info, 1);
@@ -606,7 +569,7 @@ void updateULP(void)
   {
     if (numberOfBytes == 0) return; // No network error, but garbage
 
-    // process latestULP to find version definition
+    // Process latestULP to find version definition
     int firstChar = strstr(latestULP, "string Version = ");
     string integer;
     // Update firstChar index to be first character index in the version string
